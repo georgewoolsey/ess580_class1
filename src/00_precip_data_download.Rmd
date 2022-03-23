@@ -1,0 +1,99 @@
+---
+title: "download_precip_data_co"
+author: "George Woolsey"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    # code_folding: hide
+editor_options: 
+  chunk_output_type: console
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, encoding = encoding, output_file = file.path(dirname(inputFile), 'index.html')) })
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(viridis)
+library(RColorBrewer)
+library(scales)
+# spatial analysis
+library(RApiSerialize)
+library(LAGOSNE)
+library(USAboundaries)
+library(sf)
+library(mapview) #Interactive maps
+library(leafpop) #map html popup
+library(riem)
+library(raster)
+library(elevatr)
+library(tmap)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Download data
+
+```{r, warning=F, message=F, results='hide', fig.width = 8, fig.height = 5}
+
+network <- riem_networks()
+
+co_stations <- riem_stations(network = 'CO_ASOS') %>% 
+  st_as_sf(., coords = c('lon', 'lat'), crs=4326)
+
+glimpse(co_stations)
+
+```
+
+## Make interactive map
+
+```{r, warning=F, message=F, results='hide', fig.width = 8, fig.height = 5}
+
+mapview(co_stations)
+
+```
+
+## download DEM data
+
+```{r, warning=F, message=F, results='hide', fig.width = 8, fig.height = 5}
+co_elev <- elevatr::get_elev_raster(co_stations, z = 9)
+
+str(co_elev)
+
+mapview(co_elev)
+
+```
+
+## Download county boundary data
+
+```{r, warning=F, message=F, results='hide', fig.width = 8, fig.height = 5}
+co_county <- us_counties(states = c('Colorado'))
+
+mapview(co_county)
+
+tm_shape(co_county) +
+  tm_polygons(col = 'white') +
+  tm_shape(co_stations) +
+    tm_bubbles(size=0.3)
+
+```
+
+#download precip data for specific station
+
+```{r, warning=F, message=F, results='hide', fig.width = 8, fig.height = 5}
+
+fnl <- riem_measures(station = 'FNL', date_start = '1987-01-01', date_end = '1999-12-31')
+
+daily <- fnl %>% 
+  mutate(date = as.Date(valid)) %>% 
+  group_by(date) %>% 
+  summarize(daily_temp = mean(tmpf, na.rm = TRUE))
+
+nrow(daily)
+
+ggplot(daily, aes(x = date, y = daily_temp)) +
+  geom_point() +
+  theme_bw()
+
+```
